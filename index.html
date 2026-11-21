@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>College FAQ Chatbot</title>
+
+<style>
+
+body {
+    font-family: Arial;
+    background: #eaf0f8;
+    text-align: center;
+}
+
+h1 {
+    color: #183b70;
+}
+
+.chatbox {
+    width: 400px;
+    height: 450px;
+    background: white;
+    margin: auto;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 0 10px gray;
+}
+
+#messages {
+    height: 350px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+input {
+    width: 70%;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+button {
+    padding: 10px;
+    background: #183b70;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.user {
+    color: blue;
+    margin: 10px;
+}
+
+.bot {
+    color: green;
+    margin: 10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>College FAQ Chatbot</h1>
+
+<p>Ask me anything about your college!</p>
+
+<div class="chatbox">
+
+<div id="messages">
+
+<p class="bot">
+Chatbot: Hello! How can I help you today?
+</p>
+
+</div>
+
+<input
+type="text"
+id="userInput"
+placeholder="Ask your question..."
+>
+
+<button onclick="sendMessage()">Send</button>
+
+</div>
+
+
+<script>
+
+async function sendMessage() {
+
+    let input = document.getElementById("userInput");
+
+    let message = input.value.trim();
+
+    if (message === "") return;
+
+    let messages = document.getElementById("messages");
+
+    messages.innerHTML +=
+    `<p class="user">You: ${message}</p>`;
+
+    input.value = "";
+
+    try {
+
+        let response = await fetch("/get_response", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                message: message
+            })
+
+        });
+
+        let data = await response.json();
+
+        messages.innerHTML +=
+        `<p class="bot">Chatbot: ${data.answer}<br>
+        Category: ${data.category}</p>`;
+
+    }
+
+    catch(error) {
+
+        messages.innerHTML +=
+        `<p class="bot">Unable to connect to chatbot.</p>`;
+
+    }
+
+    messages.scrollTop = messages.scrollHeight;
+
+}
+
+document.getElementById("userInput")
+.addEventListener("keypress", function(event) {
+
+    if (event.key === "Enter") {
+
+        sendMessage();
+
+    }
+
+});
+
+</script>
+
+</body>
+
+</html>
