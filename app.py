@@ -1,17 +1,62 @@
-from flask import Flask, render_template, request, jsonify
+import streamlit as st
 import csv
 import re
 from difflib import SequenceMatcher
 
-app = Flask(__name__)
 
-# Read FAQ data
+# ======================================
+# PAGE CONFIGURATION
+# ======================================
 
+st.set_page_config(
+    page_title="College FAQ Chatbot",
+    page_icon="🎓",
+    layout="centered"
+)
+
+
+# ======================================
+# CUSTOM CSS
+# ======================================
+
+st.markdown("""
+<style>
+
+.stApp {
+    background-color: #eef3fa;
+}
+
+.title {
+    text-align: center;
+    color: #183b70;
+    font-size: 35px;
+    font-weight: bold;
+}
+
+.subtitle {
+    text-align: center;
+    color: #555;
+    font-size: 17px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ======================================
+# LOAD CSV FILE
+# ======================================
+
+@st.cache_data
 def load_faq():
 
     faqs = []
 
-    with open("faq_data.csv", "r", encoding="utf-8") as file:
+    with open(
+        "faq_data.csv",
+        "r",
+        encoding="utf-8"
+    ) as file:
 
         reader = csv.DictReader(file)
 
@@ -21,21 +66,29 @@ def load_faq():
     return faqs
 
 
-faq_data = load_faq()
+faqs = load_faq()
 
 
-# Clean text
+# ======================================
+# CLEAN TEXT
+# ======================================
 
 def clean_text(text):
 
     text = text.lower()
 
-    text = re.sub(r'[^a-z0-9\s]', '', text)
+    text = re.sub(
+        r'[^a-z0-9\s]',
+        '',
+        text
+    )
 
     return text
 
 
-# Find answer
+# ======================================
+# FIND BEST ANSWER
+# ======================================
 
 def find_answer(user_question):
 
@@ -47,7 +100,7 @@ def find_answer(user_question):
 
     user_words = set(user_question.split())
 
-    for faq in faq_data:
+    for faq in faqs:
 
         question = clean_text(faq["Question"])
 
@@ -61,13 +114,22 @@ def find_answer(user_question):
 
         union = user_words.union(faq_words)
 
-        word_score = len(common) / len(union) if union else 0
+        word_score = (
+            len(common) / len(union)
+            if union else 0
+        )
 
         similarity = SequenceMatcher(
-            None, user_question, question
+            None,
+            user_question,
+            question
         ).ratio()
 
-        score = (word_score * 0.6) + (similarity * 0.4)
+        score = (
+            word_score * 0.6
+            +
+            similarity * 0.4
+        )
 
         if score > highest_score:
 
@@ -77,39 +139,157 @@ def find_answer(user_question):
 
     if highest_score >= 0.20 and best_match:
 
-        return {
-            "answer": best_match["Answer"],
-            "category": best_match["Category"]
+        return (
+            best_match["Answer"],
+            best_match["Category"]
+        )
+
+    else:
+
+        return (
+            "Sorry, I couldn't understand your question. "
+            "Please try asking differently or contact "
+            "the college administration.",
+            "General"
+        )
+
+
+# ======================================
+# WEBSITE HEADER
+# ======================================
+
+st.markdown(
+    '<div class="title">🎓 College FAQ Chatbot</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<div class="subtitle">'
+    'Your smart assistant for college-related queries!'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+st.write("")
+
+st.info(
+    "Ask me anything about Admission, Academics, "
+    "Fees, Examinations, Attendance, Hostel, "
+    "Library, Placements and Campus Facilities."
+)
+
+
+# ======================================
+# SIDEBAR
+# ======================================
+
+st.sidebar.title("📚 FAQ Categories")
+
+categories = sorted(
+    set(faq["Category"] for faq in faqs)
+)
+
+for category in categories:
+
+    count = sum(
+        1 for faq in faqs
+        if faq["Category"] == category
+    )
+
+    st.sidebar.write(
+        f"📌 {category} ({count} questions)"
+    )
+
+st.sidebar.markdown("---")
+
+st.sidebar.success(
+    f"Total FAQs Available: {len(faqs)}"
+)
+
+
+# ======================================
+# CHAT HISTORY
+# ======================================
+
+if "messages" not in st.session_state:
+
+    st.session_state.messages = [
+        {
+            "role": "assistant",
+            "content": "Hello! Welcome to the College FAQ Chatbot. How can I help you today?"
         }
-
-    return {
-        "answer": "Sorry, I couldn't understand your question. Please try asking differently or contact the college administration.",
-        "category": "General"
-    }
+    ]
 
 
-# Homepage
+# ======================================
+# DISPLAY PREVIOUS MESSAGES
+# ======================================
 
-@app.route("/")
-def home():
+for message in st.session_state.messages:
 
-    return render_template("index.html")
+    with st.chat_message(message["role"]):
 
-
-# Chatbot response
-
-@app.route("/get_response", methods=["POST"])
-def get_response():
-
-    user_message = request.json["message"]
-
-    response = find_answer(user_message)
-
-    return jsonify(response)
+        st.markdown(message["content"])
 
 
-# Run application
+# ======================================
+# USER INPUT
+# ======================================
 
-if __name__ == "__main__":
+user_question = st.chat_input(
+    "Type your college-related question here..."
+)
 
-    app.run(debug=True)
+
+# ======================================
+# GENERATE RESPONSE
+# ======================================
+
+if user_question:
+
+    # Display user question
+
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": user_question
+        }
+    )
+
+    with st.chat_message("user"):
+
+        st.markdown(user_question)
+
+    # Find chatbot response
+
+    answer, category = find_answer(user_question)
+
+    response = (
+        f"{answer}\n\n"
+        f"**Category:** {category}"
+    )
+
+    # Display chatbot answer
+
+    with st.chat_message("assistant"):
+
+        st.markdown(response)
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": response
+        }
+    )
+
+
+
+
+   
+            
+
+    
+
+
+
+    
